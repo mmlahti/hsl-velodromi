@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="fi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HSL Pysäkkinäyttö Velodromi</title>
+    <style>
+        body {
+            background-color: #ffffff;
+            color: #000000;
+            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+        }
+        .stop-container {
+            margin-bottom: 40px;
+        }
+        h2 {
+            font-size: 36px;
+            margin-top: 0;
+            margin-bottom: 15px;
+            border-bottom: 4px solid #000000;
+            padding-bottom: 10px;
+            letter-spacing: 1px;
+        }
+        .departure {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #000000;
+        }
+        /* Poistetaan alin viiva, jotta näyttää siistimmältä */
+        .departure:last-child {
+            border-bottom: none;
+        }
+        .time {
+            font-weight: bold;
+            font-size: 32px;
+            min-width: 100px;
+        }
+        .line {
+            font-weight: bold;
+            font-size: 32px;
+            min-width: 80px;
+        }
+        .destination {
+            flex-grow: 1;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            padding-left: 20px;
+            font-size: 28px;
+        }
+        .error {
+            font-size: 24px;
+            font-weight: bold;
+            border: 4px solid #000000;
+            padding: 20px;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="all-stops">Ladataan aikatauluja...</div>
+
+    <script>
+        // 1. LISÄÄ TÄHÄN API-AVAIMESI
+        const API_KEY = 'dd44817b14fe465c9122a1d123f369e8';
+        
+        // 2. LISÄÄ TÄHÄN HALUAMASI PYSÄKKIEN ID:t (erotettu pilkulla ja heittomerkeissä)
+        const STOP_IDS = ['HSL:1173430', 'HSL:1173429', 'HSL:1173408']; 
+
+        // Kuinka monta lähtöä per pysäkki näytetään (muuta tarvittaessa näytön koon mukaan)
+        const DEPARTURES_PER_STOP = 3;
+
+        function formatTime(secondsFromMidnight) {
+            const hours = Math.floor(secondsFromMidnight / 3600) % 24;
+            const minutes = Math.floor((secondsFromMidnight % 3600) / 60);
+            return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+        }
+
+        // Funktio yhden pysäkin hakemiseen
+        async function fetchSingleStop(stopId) {
+            const query = `
+            {
+              stop(id: "${stopId}") {
+                name
+                stoptimesWithoutPatterns(numberOfDepartures: ${DEPARTURES_PER_STOP}) {
+                  realtimeDeparture
+                  headsign
+                  trip {
+                    route {
+                      shortName
+                    }
+                  }
+                }
+              }
+            }`;
+
+            const response = await fetch('https://api.digitransit.fi/routing/v2/hsl/gtfs/v1', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'digitransit-subscription-key': API_KEY
+                },
+                body: JSON.stringify({ query })
+            });
+
+            if (!response.ok) throw new Error(`Virhe haettaessa pysäkkiä ${stopId}`);
+            const result = await response.json();
+            return result.data.stop;
+        }
+
+        // Pääfunktio, joka hakee kaikki listatut pysäkit
+        async function fetchAllStops() {
+            try {
+                const container = document.getElementById('all-stops');
+                
+                // Haetaan kaikkien pysäkkien tiedot samanaikaisesti (nopeuttaa latausta)
+                const stopPromises = STOP_IDS.map(id => fetchSingleStop(id));
+                const stopsData = await Promise.all(stopPromises);
+                
+                container.innerHTML = ''; // Tyhjennetään "Ladataan..." teksti
+
+                // Luodaan jokaiselle pysäkille oma osionsa
+                stopsData.forEach(stop => {
+                    if (!stop) return; // Jos pysäkkiä ei löydy, hypätään yli
+
+                    let stopHtml = `
+                        <div class="stop-container">
+                            <h2>${stop.name}</h2>
+                    `;
+
+                    stop.stoptimesWithoutPatterns.forEach(dep => {
+                        const time = formatTime(dep.realtimeDeparture);
+                        const line = dep.trip.route.shortName;
+                        const destination = dep.headsign || 'Päätepysäkki';
+
+                        stopHtml += `
+                            <div class="departure">
+                                <div class="time">${time}</div>
+                                <div class="line">${line}</div>
+                                <div class="destination">${destination}</div>
+                            </div>
+                        `;
+                    });
+
+                    stopHtml += `</div>`;
+                    container.innerHTML += stopHtml;
+                });
+
+            } catch (error) {
+                document.getElementById('all-stops').innerHTML = `
+                    <div class="error">Virhe ladatessa tietoja:<br>${error.message}</div>
+                `;
+            }
+        }
+
+        // Suorita haku heti ja päivitä minuutin välein
+        fetchAllStops();
+        setInterval(fetchAllStops, 60000);
+    </script>
+</body>
+</html>

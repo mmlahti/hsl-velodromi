@@ -42,7 +42,6 @@
             font-weight: bold;
             font-size: 24px; 
             min-width: 65px; 
-			text-align: right;
         }
         .destination {
             flex-grow: 1;
@@ -66,7 +65,7 @@
     <div id="all-stops">Ladataan aikatauluja...</div>
 
     <script>
-        // 1. API-AVAIN
+		// 1. API-AVAIN
         const API_KEY = 'dd44817b14fe465c9122a1d123f369e8';
         
         // 2. MÄÄRITÄ PYSÄKIT JA NIIDEN OTSIKOT TÄSSÄ
@@ -79,16 +78,22 @@
         const DEPARTURES_PER_STOP = 3;
 
         function formatTime(secondsFromMidnight, isRealtime) {
-            const now = new Date();
+            // Pakotetaan laitteen kello Suomen aikaan erotuksen laskemista varten
+            const systemNow = new Date();
+            const helsinkiTimeStr = systemNow.toLocaleString('en-US', { timeZone: 'Europe/Helsinki' });
+            const now = new Date(helsinkiTimeStr);
+            
             const currentSeconds = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
             
             let diff = secondsFromMidnight - currentSeconds;
             
+            // Yövuorojen vuorokausikorjaus
             if (diff > 43200) diff -= 86400;
             if (diff < -43200) diff += 86400;
 
             let timeString = '';
 
+            // Jos lähtöön on alle 10 min (600 sekuntia)
             if (diff > -60 && diff < 600) {
                 const mins = Math.max(0, Math.floor(diff / 60));
                 timeString = `${mins} min`;
@@ -98,6 +103,7 @@
                 timeString = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
             }
 
+            // Lisätään tilde (~), jos kyseessä on pelkkä aikatauluarvio ilman GPS-yhteyttä
             return isRealtime ? timeString : `~${timeString}`;
         }
 
@@ -182,6 +188,12 @@
                     container.innerHTML += stopHtml;
                 });
 
+                // 3. BLOTCH LIVE MODE -PÄIVITYS
+                // Vaihda tämä URL HSL-widgetin omaan webhook-osoitteeseen!
+                // new Image().src -kikka pakottaa laitteen huomioimaan päivityksen.
+                const webhookUrl = "https://live.blotch.app/hook/frame/AVwxbJIXwdggYrqGgMYp/widget/RwriDsS4qcB1tH1c6C8T";
+                new Image().src = webhookUrl + "?t=" + new Date().getTime();
+
             } catch (error) {
                 document.getElementById('all-stops').innerHTML = `
                     <div class="error">Virhe ladatessa tietoja:<br>${error.message}</div>
@@ -189,8 +201,9 @@
             }
         }
 
+        // Suoritetaan heti ja sen jälkeen minuutin (60000 ms) välein
         fetchAllStops();
-        setInterval(fetchAllStops, 60000);
+        setInterval(fetchAllStops, 60000); 
     </script>
 </body>
 </html>

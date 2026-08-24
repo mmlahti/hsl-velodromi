@@ -3,31 +3,31 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HSL Pysäkkinäyttö</title>
+    <title>HSL lähdöt Velodromi</title>
     <style>
         body {
             background-color: #ffffff;
             color: #000000;
             font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
             margin: 0;
-            padding: 20px;
+            padding: 15px;
         }
         .stop-container {
-            margin-bottom: 20px;
+            margin-bottom: 30px;
         }
         h2 {
-            font-size: 28px;
+            font-size: 28px; /* Oli 36px */
             margin-top: 0;
-            margin-bottom: 15px;
-            border-bottom: 4px solid #000000;
-            padding-bottom: 10px;
+            margin-bottom: 12px;
+            border-bottom: 3px solid #000000;
+            padding-bottom: 8px;
             letter-spacing: 1px;
         }
         .departure {
             display: flex;
             align-items: center;
-            margin-bottom: 15px;
-            padding-bottom: 10px;
+            margin-bottom: 12px;
+            padding-bottom: 8px;
             border-bottom: 1px solid #000000;
         }
         .departure:last-child {
@@ -35,29 +35,28 @@
         }
         .time {
             font-weight: bold;
-            font-size: 24px;
-            min-width: 100px;
+            font-size: 24px; /* Oli 32px */
+            min-width: 85px; /* Kavonnettu */
         }
         .line {
             font-weight: bold;
-            font-size: 24px;
-            min-width: 80px;
-            text-align: right;
+            font-size: 24px; /* Oli 32px */
+            min-width: 65px; /* Kavonnettu */
         }
         .destination {
             flex-grow: 1;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
-            padding-left: 20px;
-            font-size: 20px;
+            padding-left: 15px;
+            font-size: 22px; /* Oli 28px */
         }
         .error {
             font-size: 18px;
             font-weight: bold;
-            border: 4px solid #000000;
-            padding: 20px;
-            margin-top: 20px;
+            border: 3px solid #000000;
+            padding: 15px;
+            margin-top: 15px;
         }
     </style>
 </head>
@@ -66,41 +65,39 @@
     <div id="all-stops">Ladataan aikatauluja...</div>
 
     <script>
-        // 1. LISÄÄ TÄHÄN API-AVAIMESI
+        // 1. API-AVAIN
         const API_KEY = 'dd44817b14fe465c9122a1d123f369e8';
         
         // 2. MÄÄRITÄ PYSÄKIT JA NIIDEN OTSIKOT TÄSSÄ
-        // Korvaa 'HSL:ID_TÄHÄN' -kohdat oikeilla GtfsId-tunnuksilla
         const STOPS = [
             { id: 'HSL:1173430', title: 'Kalasatamaan' },
             { id: 'HSL:1173429', title: 'Pasilaan' },
             { id: 'HSL:1173408', title: 'Kurviin' }
         ]; 
+
         const DEPARTURES_PER_STOP = 2;
 
-        // UUDISTETTU AIKAMUOTOILU
-        function formatTime(secondsFromMidnight) {
+        function formatTime(secondsFromMidnight, isRealtime) {
             const now = new Date();
-            // Lasketaan laitteen nykyinen aika sekunteina vuorokauden alusta
             const currentSeconds = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
             
-            // Erotus sekunteina
             let diff = secondsFromMidnight - currentSeconds;
             
-            // Korjataan vuorokauden vaihtumiseen liittyvät heitot (HSL käyttää >24h aikoja yövuoroissa)
             if (diff > 43200) diff -= 86400;
             if (diff < -43200) diff += 86400;
 
-            // Jos lähtöön on alle 10 minuuttia (600 s) ja bussi ei ole jo mennyt (vähintään 0 min)
+            let timeString = '';
+
             if (diff > -60 && diff < 600) {
                 const mins = Math.max(0, Math.floor(diff / 60));
-                return `${mins} min`;
+                timeString = `${mins} min`;
+            } else {
+                const hours = Math.floor(secondsFromMidnight / 3600) % 24;
+                const minutes = Math.floor((secondsFromMidnight % 3600) / 60);
+                timeString = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
             }
 
-            // Muussa tapauksessa näytetään normaali kellonaika (HH:MM)
-            const hours = Math.floor(secondsFromMidnight / 3600) % 24;
-            const minutes = Math.floor((secondsFromMidnight % 3600) / 60);
-            return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+            return isRealtime ? timeString : `~${timeString}`;
         }
 
         async function fetchSingleStop(stopConfig) {
@@ -109,6 +106,7 @@
               stop(id: "${stopConfig.id}") {
                 stoptimesWithoutPatterns(numberOfDepartures: ${DEPARTURES_PER_STOP}) {
                   realtimeDeparture
+                  realtime
                   headsign
                   trip {
                     route {
@@ -165,7 +163,7 @@
                         `;
                     } else {
                         stop.stoptimesWithoutPatterns.forEach(dep => {
-                            const time = formatTime(dep.realtimeDeparture);
+                            const time = formatTime(dep.realtimeDeparture, dep.realtime);
                             const line = dep.trip.route.shortName;
                             const destination = dep.headsign || 'Päätepysäkki';
 

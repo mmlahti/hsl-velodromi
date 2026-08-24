@@ -182,6 +182,10 @@
                     container.innerHTML += stopHtml;
                 });
 
+				// UUSI RIVI: Ilmoitetaan Blotchille, että data on päivitetty!
+                // HUOM: Korvaa tämä URL sillä, jonka löysit HSL-widgetin asetuksista
+                fetch('https://live.blotch.app/hook/frame/AVwxbJIXwdggYrqGgMYp/widget/RwriDsS4qcB1tH1c6C8T', { mode: 'no-cors' });
+				
             } catch (error) {
                 document.getElementById('all-stops').innerHTML = `
                     <div class="error">Virhe ladatessa tietoja:<br>${error.message}</div>

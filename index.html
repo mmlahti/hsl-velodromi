@@ -75,16 +75,33 @@
             { id: 'HSL:1173429', title: 'Pasilaan' },
             { id: 'HSL:1173408', title: 'Kurviin' }
         ]; 
-
         const DEPARTURES_PER_STOP = 2;
 
+        // UUDISTETTU AIKAMUOTOILU
         function formatTime(secondsFromMidnight) {
+            const now = new Date();
+            // Lasketaan laitteen nykyinen aika sekunteina vuorokauden alusta
+            const currentSeconds = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
+            
+            // Erotus sekunteina
+            let diff = secondsFromMidnight - currentSeconds;
+            
+            // Korjataan vuorokauden vaihtumiseen liittyvät heitot (HSL käyttää >24h aikoja yövuoroissa)
+            if (diff > 43200) diff -= 86400;
+            if (diff < -43200) diff += 86400;
+
+            // Jos lähtöön on alle 10 minuuttia (600 s) ja bussi ei ole jo mennyt (vähintään 0 min)
+            if (diff > -60 && diff < 600) {
+                const mins = Math.max(0, Math.floor(diff / 60));
+                return `${mins} min`;
+            }
+
+            // Muussa tapauksessa näytetään normaali kellonaika (HH:MM)
             const hours = Math.floor(secondsFromMidnight / 3600) % 24;
             const minutes = Math.floor((secondsFromMidnight % 3600) / 60);
             return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
         }
 
-        // Haetaan pysäkin tiedot
         async function fetchSingleStop(stopConfig) {
             const query = `
             {
@@ -113,7 +130,6 @@
             if (!response.ok) throw new Error(`Virhe haettaessa pysäkkiä ${stopConfig.id}`);
             const result = await response.json();
             
-            // Palautetaan sekä API:n data ETTÄ meidän oma otsikkomme
             return {
                 customTitle: stopConfig.title,
                 data: result.data.stop
@@ -140,7 +156,6 @@
                             <h2>${customTitle}</h2>
                     `;
 
-                    // Pieni lisäys: näytetään viesti, jos lähtöjä ei ole (esim. yöllä)
                     if (stop.stoptimesWithoutPatterns.length === 0) {
                         stopHtml += `
                             <div class="departure">
